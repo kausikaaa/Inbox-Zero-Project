@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { emailAPI } from "../api.js";
+import FilterBar from "../components/FilterBar.jsx";
 
 function InboxPage() {
   const [emails, setEmails] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [user, setUser] = useState(null);
+  const [currentFilter, setCurrentFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     // Get user info from localStorage
@@ -55,7 +58,55 @@ function InboxPage() {
 
   // Filter to show only non-archived emails
   const inboxEmails = emails.filter(email => !email.isArchived);
+  
+  // Apply filtering based on current filter
+  const getFilteredEmails = () => {
+    let filteredEmails = inboxEmails;
+    
+    // Apply read/unread filter
+    switch (currentFilter) {
+      case 'unread':
+        filteredEmails = filteredEmails.filter(email => !email.isRead);
+        break;
+      case 'read':
+        filteredEmails = filteredEmails.filter(email => email.isRead);
+        break;
+      case 'all':
+      default:
+        // Show all non-archived emails
+        break;
+    }
+    
+    // Apply search filter if search query exists
+    if (searchQuery.trim()) {
+      filteredEmails = filteredEmails.filter(email => 
+        email.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.body.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        email.sender.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    return filteredEmails;
+  };
+
+  const filteredEmails = getFilteredEmails();
   const unreadCount = inboxEmails.filter(email => !email.isRead).length;
+  const readCount = inboxEmails.filter(email => email.isRead).length;
+  
+  // Email counts for FilterBar
+  const emailCounts = {
+    all: inboxEmails.length,
+    unread: unreadCount,
+    read: readCount
+  };
+
+  const handleFilterChange = (filter) => {
+    setCurrentFilter(filter);
+  };
+
+  const handleSearchChange = (query) => {
+    setSearchQuery(query);
+  };
 
   if (isLoading) {
     return (
@@ -73,7 +124,8 @@ function InboxPage() {
           Inbox {user && `- ${user.name}`}
         </h1>
         <p className="text-gray-600 mt-2">
-          {inboxEmails.length} total emails, {unreadCount} unread
+          {emailCounts.all} total emails, {emailCounts.unread} unread
+          {searchQuery && ` • ${filteredEmails.length} matching search`}
         </p>
       </div>
 
@@ -83,19 +135,60 @@ function InboxPage() {
         </div>
       )}
 
+      {/* Filter Bar */}
+      <FilterBar
+        currentFilter={currentFilter}
+        onFilterChange={handleFilterChange}
+        emailCounts={emailCounts}
+        showSearch={true}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+      />
+
       {/* Email List */}
-      {inboxEmails.length === 0 ? (
+      {filteredEmails.length === 0 ? (
         <div className="text-center py-12">
-          <div className="text-gray-500 text-lg">
-            🎉 Inbox Zero! No emails here.
-          </div>
-          <p className="text-gray-400 mt-2">
-            You've achieved inbox zero or no emails have been loaded yet.
-          </p>
+          {searchQuery ? (
+            <div>
+              <div className="text-gray-500 text-lg">
+                🔍 No emails found
+              </div>
+              <p className="text-gray-400 mt-2">
+                No emails match your search "{searchQuery}"
+              </p>
+            </div>
+          ) : currentFilter === 'unread' ? (
+            <div>
+              <div className="text-gray-500 text-lg">
+                ✅ All caught up!
+              </div>
+              <p className="text-gray-400 mt-2">
+                No unread emails in your inbox.
+              </p>
+            </div>
+          ) : currentFilter === 'read' ? (
+            <div>
+              <div className="text-gray-500 text-lg">
+                📖 No read emails
+              </div>
+              <p className="text-gray-400 mt-2">
+                You haven't read any emails yet.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <div className="text-gray-500 text-lg">
+                🎉 Inbox Zero! No emails here.
+              </div>
+              <p className="text-gray-400 mt-2">
+                You've achieved inbox zero or no emails have been loaded yet.
+              </p>
+            </div>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
-          {inboxEmails.map((email) => (
+          {filteredEmails.map((email) => (
             <div
               key={email.id}
               className={`border rounded-lg p-4 transition-colors ${
