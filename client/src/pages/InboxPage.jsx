@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import { emailAPI } from "../api.js";
 import FilterBar from "../components/FilterBar.jsx";
+import ProgressBar from "../components/ProgressBar.jsx";
+import InboxZeroCelebration from "../components/InboxZeroCelebration.jsx";
+import { calculateInboxProgress } from "../utils/progressUtils.js";
 
 function InboxPage() {
   const [emails, setEmails] = useState([]);
@@ -9,6 +12,8 @@ function InboxPage() {
   const [user, setUser] = useState(null);
   const [currentFilter, setCurrentFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [hasAchievedInboxZero, setHasAchievedInboxZero] = useState(false);
 
   useEffect(() => {
     // Get user info from localStorage
@@ -100,6 +105,19 @@ function InboxPage() {
     read: readCount
   };
 
+  // Progress calculation for Inbox Zero using utility function
+  const progressData = calculateInboxProgress(emails);
+
+  // Check for Inbox Zero achievement
+  useEffect(() => {
+    if (progressData.isInboxZero && progressData.totalEmails > 0 && !hasAchievedInboxZero) {
+      setShowCelebration(true);
+      setHasAchievedInboxZero(true);
+    } else if (!progressData.isInboxZero) {
+      setHasAchievedInboxZero(false);
+    }
+  }, [progressData.isInboxZero, progressData.totalEmails, hasAchievedInboxZero]);
+
   const handleFilterChange = (filter) => {
     setCurrentFilter(filter);
   };
@@ -134,6 +152,17 @@ function InboxPage() {
           <div className="text-sm text-red-700">{error}</div>
         </div>
       )}
+
+      {/* Progress Bar */}
+      <div className="mb-6">
+        <ProgressBar
+          progress={progressData.progress}
+          totalEmails={progressData.totalEmails}
+          processedEmails={progressData.processedEmails}
+          showDetails={true}
+          size="medium"
+        />
+      </div>
 
       {/* Filter Bar */}
       <FilterBar
@@ -249,6 +278,12 @@ function InboxPage() {
           ))}
         </div>
       )}
+
+      {/* Inbox Zero Celebration Modal */}
+      <InboxZeroCelebration
+        show={showCelebration}
+        onClose={() => setShowCelebration(false)}
+      />
     </div>
   );
 }
